@@ -106,6 +106,8 @@ mark{background:var(--accent-soft);color:var(--accent);padding:0 4px;border-radi
 .ph .nm{font-weight:600}
 .phh{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
 .lgrid{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px;margin-top:8px}
+.hrow{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.hrow .sb{grid-column:1/-1}
 .lchip{position:relative;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card,transparent);color:inherit;font:600 14px inherit;font-family:inherit;cursor:pointer}
 .lchip i{position:absolute;top:1px;right:4px;font-size:10px;font-style:normal;color:var(--accent)}
 .lchip.dn{background:var(--accent-soft)}
@@ -3416,7 +3418,7 @@ const SCENES=[
 /* ---------- lưu trữ ---------- */
 const KEY='loi-tu-ra:v1';
 function load(){try{const r=localStorage.getItem(KEY);if(r)return JSON.parse(r)}catch(e){}return null}
-let S=Object.assign({prog:{},custom:[],days:[],diag:[],set:{},plan:{done:0,last:''},listen:null},load()||{});if(!S.plan)S.plan={done:0,last:''};
+let S=Object.assign({prog:{},custom:[],days:[],diag:[],set:{},plan:{done:0,last:''},listen:null,log:{}},load()||{});if(!S.plan)S.plan={done:0,last:''};
 S.set=Object.assign({accent:'en-US',rate:.9,mode:'auto',topic:'all',batch:10,auto:true,voice:''},S.set);
 if(S.set.v2!==1){S.set.v2=1;S.set.accent='en-US';S.set.rate=.9}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
@@ -3520,6 +3522,10 @@ function startLesson(n){
 function planFix(){if(!S.plan)S.plan={done:0,last:''};if(S.plan.base===undefined){S.plan.base=S.plan.done||0;S.plan.ok={}}if(!S.plan.ok)S.plan.ok={}}
 const lDone=n=>n<=(S.plan.base||0)||!!S.plan.ok[n];
 let openPh=null,pickL=null;const nextL=()=>{planFix();for(let n=1;n<=LESSONS;n++)if(!lDone(n))return n;return LESSONS};
+function histPanel(){
+  const lg=S.log||{},ks=Object.keys(lg).sort().reverse().slice(0,14);
+  const rows=ks.length?ks.map(k=>{const L=lg[k],[y,m,d]=k.split('-');return `<div class="hrow"><span>${+d}/${+m}/${y}</span><span>${L.n} lượt · ${L.ok} nói đúng</span><span class="sb">${L.ls&&L.ls.length?'Xong ngày '+L.ls.join(', '):''}</span></div>`}).join(''):'<p class="muted">Chưa có lượt học nào được ghi. Học xong một thẻ, lịch sử sẽ hiện ở đây.</p>';
+  return `<div class="panel stack"><h3>Lịch sử học</h3>${rows}<p class="hint">Lịch sử lưu trong trình duyệt của thiết bị này. Trên iPhone, hãy luôn học ở cùng một nơi (Safari hoặc biểu tượng trên màn hình chính) để không bị tách thành hai bản.</p></div>`}
 function vPlan(){
   planFix();let done=0,nx=0;for(let n=1;n<=LESSONS;n++){if(lDone(n))done++;else if(!nx)nx=n}
   const today=dayKey(),doneToday=S.plan.last===today;
@@ -3555,6 +3561,7 @@ function vPlan(){
   </div>
   <div class="panel stack"><h3>Các chặng và từng bài</h3><p class="hint">Bấm tên chặng để mở danh sách bài. Chọn một ngày để xem 10 từ rồi học hoặc ôn lại. Dấu ✓ là bài đã xong.</p><div>${phaseRows}</div>
     <p class="hint">Lộ trình tính theo số bài đã học, không theo ngày lịch. Nếu bạn nghỉ vài ngày, bài hôm nay vẫn là bài kế tiếp, không bị dồn.</p></div>
+  ${histPanel()}
   <div class="panel stack"><h3>Nhịp học mỗi ngày (10 đến 15 phút)</h3>
     <ol class="steps">
       <li><span><b>Ôn trước (khoảng 3 phút).</b> Hệ thống đưa tối đa 10 từ đến hạn lên đầu bài. Nói từ ra thành tiếng, đừng nhìn đáp án sớm.</span></li>
@@ -3615,8 +3622,9 @@ function rateCard(r){
   if(r==='ok'){p.box=Math.min(p.box+1,6);p.due=now+INT[p.box]*DAY;s.ok++}
   else if(r==='near'){p.box=Math.max(p.box,1);p.due=now+DAY;s.near++}
   else{p.box=0;p.due=now;if(r==='wrong')s.wrong=(s.wrong||0)+1;else if(r==='forgot')s.wrong=(s.wrong||0)+1;else s.fail++;if(!s.req[id]){s.req[id]=1;s.queue.splice(Math.min(s.idx+4,s.queue.length),0,id)}}
+  {const k=dayKey();if(!S.log)S.log={};const L=S.log[k]||(S.log[k]={n:0,ok:0,ls:[]});L.n++;if(r==='ok')L.ok++;const ks=Object.keys(S.log).sort();if(ks.length>60)delete S.log[ks[0]]}
   S.prog[id]=p;s.idx++;s.phase='front';s.typed='';s.alts=[];s.fall=s.fall;
-  if(s.idx>=s.queue.length){s.phase='done';markDay();S.listen=lisMake(s.queue,s.lesson);lis={veil:true,vi:false,pl:-1};if(s.lesson){planFix();S.plan.ok[s.lesson]=1;S.plan.last=dayKey()}}else s.mode=modeFor(byId(s.queue[s.idx]));
+  if(s.idx>=s.queue.length){s.phase='done';markDay();S.listen=lisMake(s.queue,s.lesson);lis={veil:true,vi:false,pl:-1};if(s.lesson){planFix();S.plan.ok[s.lesson]=1;S.plan.last=dayKey();{const L=S.log[dayKey()];if(L&&!L.ls.includes(s.lesson))L.ls.push(s.lesson)}}}else s.mode=modeFor(byId(s.queue[s.idx]));
   save()}
 function highlighted(w){
   const f=findIn(w.ctx,w.en);if(!f)return esc(w.ctx);
@@ -3634,8 +3642,9 @@ const APPLE=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform===
 function inputArea(s){
   const inp=(S.set.inp==='type'||s.fall)?'type':'say',lk=s.cdIdx!==s.idx?' disabled':'';
   const sw=`<div class="inp-sw" role="group" aria-label="Cách trả lời"><button class="btn sm" data-act="inp" data-v="say" aria-pressed="${inp==='say'}"${lk}>Nói</button><button class="btn sm" data-act="inp" data-v="type" aria-pressed="${inp==='type'}"${lk}>Gõ</button></div>`;
-  if(inp==='type')return sw+`<input type="text" id="typed" placeholder="${!lk&&s.fallMsg?'Không dùng được micro ('+(s.fallMsg===1?'không hỗ trợ':s.fallMsg)+') nên chuyển sang gõ. Gõ từ vào đây':lk?'Hãy nhớ trong 3 giây, rồi mới gõ được':'Gõ từ tiếng Anh vào đây'}"${lk} autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Gõ từ tiếng Anh">`;
+  if(inp==='type')return sw+`<input type="text" id="typed" placeholder="${!lk&&s.fallMsg?'Không dùng được micro ('+(s.fallMsg===1?'không hỗ trợ':s.fallMsg)+') nên chuyển sang gõ. Gõ từ vào đây':lk?'Hãy nhớ trong 3 giây, rồi mới gõ được':APPLE?'Chạm vào đây, bấm 🎤 trên bàn phím để nói':'Gõ từ tiếng Anh vào đây'}"${lk} autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Gõ từ tiếng Anh">${APPLE?'<p class="hint">iPhone: chạm vào ô, rồi bấm biểu tượng micro 🎤 trên bàn phím để nói. Máy sẽ chép lời bạn nói vào ô này.</p>':''}`;
   return sw+`<div class="mic"><button class="btn${recOn?' rec':''}" id="micbtn" data-act="mic"${lk}>${recOn?'Dừng thu âm':'Bấm để thu âm và nói'}</button><div class="say-out" id="sayout" aria-live="polite">${s.typed?esc(s.typed):''}</div><p class="hint" id="micst">${lk?'Hãy nhớ trong 3 giây. Hết 3 giây bạn mới được thu âm.':SR?'Nói xong bấm Xem đáp án. Máy sẽ ghi lại những gì nghe được.':'Trình duyệt này chưa hỗ trợ thu âm nhận dạng giọng nói. Bạn cứ nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.'}</p></div>`}
+if(APPLE&&!S.set.inpAuto){S.set.inp='type';S.set.inpAuto=1;save()}
 function micToggle(auto){
   const st=$('#micst'),out=$('#sayout');
   if(!SR){if(st)st.textContent='Trình duyệt này chưa hỗ trợ thu âm nhận dạng giọng nói. Hãy nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.';return}
@@ -3687,7 +3696,7 @@ function startCd(){
   b.disabled=true;setTimeout(()=>{bar.style.transition='width 3s linear';bar.style.width='100%'},40);
   cdT=setTimeout(()=>{b.disabled=false;
     if(ln){session.cdIdx=session.idx;document.querySelectorAll('.inp-sw .btn,#typed,#micbtn').forEach(e=>{e.disabled=false});
-      const t=$('#typed');if(t){t.placeholder='Gõ từ tiếng Anh vào đây';t.focus({preventScroll:true})}
+      const t=$('#typed');if(t){t.placeholder=APPLE?'Chạm vào đây, bấm 🎤 trên bàn phím để nói':'Gõ từ tiếng Anh vào đây';t.focus({preventScroll:true})}
       if(!t&&S.set.inp!=='type'&&!session.fall){if(!SR){session.fall=true;session.fallMsg=1;render();const t2=$('#typed');if(t2)t2.focus({preventScroll:true});return}session.typed='';if(APPLE){const ms0=$('#micst');if(ms0)ms0.textContent='Bấm nút thu âm để nói (iPhone và Safari cần bạn bấm trước).'}else micToggle(true)}
       const ms=$('#micst');if(ms&&!APPLE)ms.textContent=SR?'Nói xong bấm Xem đáp án. Máy sẽ ghi lại những gì nghe được.':'Trình duyệt này chưa hỗ trợ thu âm nhận dạng giọng nói. Bạn cứ nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.';
       lab.textContent='Hết 3 giây. Bây giờ bạn có thể nói, gõ đáp án hoặc xem đáp án.'}
@@ -3865,7 +3874,7 @@ document.addEventListener('click',e=>{
     case 'ph':{const cur=openPh===null?phaseOf(nextL()):openPh;openPh=cur===d.v?'none':d.v;pickL=null;render();break}
     case 'pick':pickL=pickL===+d.v?null:+d.v;render();break;
     case 'end':if(rec&&recOn){try{rec.abort()}catch(e){}}session=null;stopAudio();render();break;
-    case 'inp':S.set.inp=d.v;save();render();break;
+    case 'inp':S.set.inp=d.v;if(session){session.fall=false;session.fallMsg=0}save();render();break;
     case 'mic':micToggle();break;
     case 'reveal':{if(rec&&recOn){try{rec.stop()}catch(e){}}const t=$('#typed');if(t)session.typed=t.value;session.phase='back';render();
       if(S.set.auto){const w=byId(session.queue[session.idx]);say(w.en).then(()=>say(w.ctx))}break}
