@@ -140,6 +140,10 @@ mark{background:var(--accent-soft);color:var(--accent);padding:0 4px;border-radi
 .avgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
 .avo{aspect-ratio:1;border-radius:14px;border:1px solid var(--line);background:var(--surface);font-size:26px;cursor:pointer;padding:0}
 .avo.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent)}
+.acct{background:var(--accent-soft);border-radius:16px;padding:12px}
+.acct .field{flex:none;width:100%}
+.acct input{width:100%;box-sizing:border-box}
+.av.on::after{content:"";position:absolute;left:-2px;top:-2px;width:12px;height:12px;border-radius:50%;background:#22c55e;border:2px solid var(--bg)}
 .lvh{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .lvb{text-align:center;flex:none}
 .lvb b{display:block;font:800 36px/1 'Bricolage Grotesque',system-ui,sans-serif;background:linear-gradient(90deg,var(--g1),var(--g2));-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -3480,7 +3484,9 @@ function load(){try{const r=localStorage.getItem(KEY);if(r)return JSON.parse(r)}
 let S=Object.assign({prog:{},custom:[],days:[],diag:[],set:{},plan:{done:0,last:''},listen:null,log:{}},load()||{});if(!S.plan)S.plan={done:0,last:''};
 S.set=Object.assign({accent:'en-US',rate:.9,mode:'auto',topic:'all',batch:10,auto:true,voice:''},S.set);
 if(S.set.v2!==1){S.set.v2=1;S.set.accent='en-US';S.set.rate=.9}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+let AUTH=null,syncSt='',recov=false,pushT=0,lastPull=0,synced=0;
+function saveLocal(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){S.upd=Date.now();saveLocal();if(AUTH)schedPush()}
 
 /* ---------- tiện ích ---------- */
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -3735,7 +3741,7 @@ function startSession(){
 function rateCard(r){
   const s=session,id=s.queue[s.idx],now=Date.now();
   if(r==='next'){const w=byId(id);r=(s.typed.trim()&&heardOk(w,s))?'ok':'near'}
-  const p=Object.assign({box:0,due:0,seen:false},S.prog[id]);p.seen=true;
+  const p=Object.assign({box:0,due:0,seen:false},S.prog[id]);p.seen=true;p.ts=now;
   if(r==='ok'){p.box=Math.min(p.box+1,6);p.due=now+INT[p.box]*DAY;s.ok++}
   else if(r==='near'){p.box=Math.max(p.box,1);p.due=now+DAY;s.near++}
   else{p.box=0;p.due=now;if(r==='wrong')s.wrong=(s.wrong||0)+1;else if(r==='forgot')s.wrong=(s.wrong||0)+1;else s.fail++;if(!s.req[id]){s.req[id]=1;s.queue.splice(Math.min(s.idx+4,s.queue.length),0,id)}}
@@ -3833,6 +3839,78 @@ function fxInit(){if(FXA)return;try{FXA={ok:new Audio(wav([[1318.5,0,.3,.22],[19
 document.addEventListener('pointerdown',()=>{fxInit()},{passive:true,once:true});
 function beep(ok){if(S.set.fx===false)return false;fxInit();if(!FXA)return false;
   const a=ok?FXA.ok:FXA.no;try{a.currentTime=0;const p=a.play();if(p&&p.catch)p.catch(()=>{})}catch(e){return false}return true}
+/* ---------- tài khoản và đồng bộ (Supabase, gọi trực tiếp bằng fetch) ---------- */
+const SB_URL='https://rssdhnwhqjgdpbmoujlx.supabase.co',SB_KEY='sb_publishable_rYtHCyMSXuvpC_tVuJPi0A_8mVsFCUI';
+const SBON=!!(SB_URL&&SB_KEY),AK='loi-tu-ra:auth';
+try{AUTH=JSON.parse(localStorage.getItem(AK)||'null')}catch(e){AUTH=null}
+function authSave(a){AUTH=a;try{if(a)localStorage.setItem(AK,JSON.stringify(a));else localStorage.removeItem(AK)}catch(e){}}
+async function sbf(path,opt,tok){opt=opt||{};const r=await fetch(SB_URL+path,Object.assign({},opt,{headers:Object.assign({apikey:SB_KEY,'Content-Type':'application/json'},tok?{Authorization:'Bearer '+tok}:{},opt.headers||{})}));
+  let j=null;try{j=await r.json()}catch(e){}
+  if(!r.ok){const e=new Error((j&&(j.msg||j.error_description||j.message||j.error))||('HTTP '+r.status));e.status=r.status;throw e}return j}
+function setSess(j){if(!j||!j.access_token)return null;authSave({at:j.access_token,rt:j.refresh_token,exp:Date.now()+(j.expires_in||3600)*1000-60000,email:(j.user&&j.user.email)||(AUTH&&AUTH.email)||'',uid:(j.user&&j.user.id)||(AUTH&&AUTH.uid)||''});return AUTH}
+let refreshing=null;
+async function tok(){if(!AUTH)return null;if(Date.now()<AUTH.exp)return AUTH.at;
+  if(!refreshing)refreshing=sbf('/auth/v1/token?grant_type=refresh_token',{method:'POST',body:JSON.stringify({refresh_token:AUTH.rt})}).then(j=>{setSess(j);return AUTH&&AUTH.at}).catch(e=>{if(e.status>=400&&e.status<500){authSave(null);syncSt='Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.';renderAcct()}return null}).finally(()=>{refreshing=null});
+  return refreshing}
+function vnErr(m){m=String(m||'');
+  if(/invalid login/i.test(m))return 'Sai email hoặc mật khẩu.';
+  if(/already registered|already been registered/i.test(m))return 'Email này đã có tài khoản. Hãy bấm Đăng nhập.';
+  if(/password.*(at least|short|weak)|least 6/i.test(m))return 'Mật khẩu cần ít nhất 6 ký tự.';
+  if(/valid email|invalid email|email address.*invalid/i.test(m))return 'Email không hợp lệ.';
+  if(/not confirmed/i.test(m))return 'Email chưa được xác nhận. Hãy mở email và bấm vào liên kết xác nhận.';
+  if(/rate limit|too many|seconds/i.test(m))return 'Bạn thử quá nhiều lần. Hãy đợi một lúc rồi thử lại.';
+  if(/failed to fetch|network|load failed/i.test(m))return 'Không kết nối được mạng. Hãy thử lại.';
+  return 'Có lỗi: '+m}
+function mergeS(a,b){
+  const nb=(b.upd||0)>(a.upd||0),nw=nb?b:a,od=nb?a:b,c=Object.assign({},od,nw);
+  const pr={};[od.prog||{},nw.prog||{}].forEach(src=>{Object.keys(src).forEach(k=>{const x=pr[k],y=src[k];if(!x||(y.ts||0)>(x.ts||0)||((y.ts||0)===(x.ts||0)&&(y.box||0)>(x.box||0)))pr[k]=y})});c.prog=pr;
+  const pa=a.plan||{},pb=b.plan||{};c.plan=Object.assign({},od.plan||{},nw.plan||{},{base:Math.max(pa.base||0,pb.base||0),done:Math.max(pa.done||0,pb.done||0),ok:Object.assign({},pa.ok||{},pb.ok||{}),last:[pa.last||'',pb.last||''].sort().pop()});
+  c.days=[...new Set([...(a.days||[]),...(b.days||[])])].sort().slice(-90);
+  const lg={};[a.log||{},b.log||{}].forEach(src=>Object.keys(src).forEach(k=>{const x=lg[k],y=src[k];lg[k]=x?{n:Math.max(x.n,y.n),ok:Math.max(x.ok,y.ok),ls:[...new Set([...(x.ls||[]),...(y.ls||[])])]}:y}));c.log=lg;
+  const seen=new Set(),dg=[];[...(a.diag||[]),...(b.diag||[])].forEach(x=>{const k=JSON.stringify(x);if(!seen.has(k)){seen.add(k);dg.push(x)}});c.diag=dg;
+  const cs=new Set(),cu=[];[...(a.custom||[]),...(b.custom||[])].forEach(x=>{const k=x&&x.id?x.id:JSON.stringify(x);if(!cs.has(k)){cs.add(k);cu.push(x)}});c.custom=cu;
+  const pf=nw.profile&&(nw.profile.name||nw.profile.img||nw.profile.emo)?nw.profile:(od.profile||nw.profile);if(pf)c.profile=pf;
+  c.upd=Math.max(a.upd||0,b.upd||0,Date.now());return c}
+function setSt(t){syncSt=t;const e=$('#syncst');if(e)e.textContent=t}
+async function pull(){if(!AUTH||!SBON)return;const t=await tok();if(!t)return;setSt('Đang đồng bộ...');
+  try{const r=await sbf('/rest/v1/progress?select=data,updated_at&user_id=eq.'+encodeURIComponent(AUTH.uid),{},t);
+    const rd=r&&r[0]&&r[0].data;
+    if(rd&&typeof rd==='object'){const before=JSON.stringify(S);const m=mergeS(S,rd);S=Object.assign({prog:{},custom:[],days:[],diag:[],set:{},plan:{done:0,last:''},listen:null,log:{}},m);planFix();saveLocal();if(JSON.stringify(S)!==before){renderProf();if(!session)render()}}
+    await push(true);lastPull=Date.now()}catch(e){setSt('Chưa đồng bộ được: '+vnErr(e.message))}}
+function schedPush(){clearTimeout(pushT);pushT=setTimeout(()=>push(false),2500)}
+async function push(quiet){if(!AUTH||!SBON)return;const t=await tok();if(!t)return;
+  try{await sbf('/rest/v1/progress?on_conflict=user_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:AUTH.uid,data:S,updated_at:new Date().toISOString()})},t);
+    synced=Date.now();setSt('Đã đồng bộ lúc '+new Date(synced).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}))}
+  catch(e){setSt('Chưa đồng bộ được: '+vnErr(e.message))}}
+async function doAuth(kind){
+  const em=(($('#ac-mail')||{}).value||'').trim(),pw=($('#ac-pw')||{}).value||'';
+  if(!em||!pw){setSt('Hãy nhập email và mật khẩu.');return}
+  setSt('Đang xử lý...');
+  try{
+    if(kind==='up'){const j=await sbf('/auth/v1/signup',{method:'POST',body:JSON.stringify({email:em,password:pw})});
+      if(j&&j.access_token){setSess(j);setSt('Đã tạo tài khoản.')}else{setSt('Đã gửi email xác nhận. Hãy mở email, bấm liên kết xác nhận, rồi quay lại đăng nhập.');renderAcct();return}}
+    else{const j=await sbf('/auth/v1/token?grant_type=password',{method:'POST',body:JSON.stringify({email:em,password:pw})});setSess(j)}
+    renderAcct();await pull();renderAcct()}
+  catch(e){setSt(vnErr(e.message))}}
+async function doForgot(){const em=(($('#ac-mail')||{}).value||'').trim();if(!em){setSt('Hãy nhập email của bạn trước.');return}
+  try{await sbf('/auth/v1/recover?redirect_to='+encodeURIComponent(location.origin+location.pathname),{method:'POST',body:JSON.stringify({email:em})});setSt('Đã gửi email đặt lại mật khẩu. Hãy mở email và bấm vào liên kết.')}catch(e){setSt(vnErr(e.message))}}
+async function doNewPw(){const pw=($('#ac-pw2')||{}).value||'';if(pw.length<6){setSt('Mật khẩu cần ít nhất 6 ký tự.');return}
+  const t=await tok();try{await sbf('/auth/v1/user',{method:'PUT',body:JSON.stringify({password:pw})},t);recov=false;setSt('Đã đặt mật khẩu mới.');renderAcct();pull()}catch(e){setSt(vnErr(e.message))}}
+function doOut(){clearTimeout(pushT);authSave(null);syncSt='';renderAcct();renderProf()}
+function renderAcct(){const a=$('#acct');if(!a)return;
+  if(!SBON){a.innerHTML='<p class="hint">Tài khoản và đồng bộ chưa được bật trong bản này.</p>';return}
+  if(recov&&AUTH){a.innerHTML=`<b>Đặt mật khẩu mới</b><label class="field"><span>Mật khẩu mới (từ 6 ký tự)</span><input type="password" id="ac-pw2" autocomplete="new-password"></label><button class="btn primary" data-act="newpw">Lưu mật khẩu</button><p class="hint" id="syncst">${esc(syncSt)}</p>`;return}
+  if(AUTH){a.innerHTML=`<b>Tài khoản</b><p class="muted">Đang đăng nhập: <b>${esc(AUTH.email||'')}</b></p><p class="hint" id="syncst">${esc(syncSt||'')}</p><div class="row"><button class="btn sm primary" data-act="sync">Đồng bộ ngay</button><button class="btn sm" data-act="out">Đăng xuất</button></div><p class="hint">Tiến độ học tự lưu lên tài khoản sau mỗi lượt học. Đăng nhập cùng email trên Chrome hoặc iPhone để học tiếp.</p>`;return}
+  a.innerHTML=`<b>Đăng nhập để lưu tiến độ</b><label class="field"><span>Email</span><input type="email" id="ac-mail" autocomplete="email" autocapitalize="off" placeholder="ban@email.com"></label><label class="field"><span>Mật khẩu (từ 6 ký tự)</span><input type="password" id="ac-pw" autocomplete="current-password"></label>
+    <div class="row"><button class="btn sm primary" data-act="signin">Đăng nhập</button><button class="btn sm" data-act="signup">Tạo tài khoản</button><button class="btn sm" data-act="forgot">Quên mật khẩu</button></div><p class="hint" id="syncst">${esc(syncSt||'')}</p>`}
+async function authBoot(){
+  if(!SBON)return;
+  const hs=location.hash;
+  if(/access_token=/.test(hs)){try{const q=new URLSearchParams(hs.replace(/^#/,''));const at=q.get('access_token');
+      const u=await sbf('/auth/v1/user',{},at);setSess({access_token:at,refresh_token:q.get('refresh_token'),expires_in:+q.get('expires_in')||3600,user:u});
+      if(q.get('type')==='recovery'){recov=true}history.replaceState(null,'',location.pathname+location.search);if(recov)openProf()}catch(e){}}
+  renderProf();if(AUTH){await pull();renderProf()}
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&AUTH&&Date.now()-lastPull>30000)pull()})}
 /* ---------- hồ sơ người học ---------- */
 const prof=()=>S.profile||(S.profile={name:'',img:'',emo:''});
 const AVEMO=['🦊','🐼','🐯','🦁','🐨','🐸','🦉','🐬','🦄','🚀','⭐','🎯'];
@@ -3841,7 +3919,7 @@ function avHtml(sz){const p=prof(),f=Math.round(sz*.46);
   if(p.emo)return `<span style="font-size:${f}px">${p.emo}</span>`;
   if(p.name)return `<span style="font-size:${f}px;font-weight:800">${esc(p.name.trim()[0].toUpperCase())}</span>`;
   return `<span style="font-size:${f}px">🙂</span>`}
-function renderProf(){
+function renderProf(){const ab=$('#avbtn');if(ab)ab.classList.toggle('on',!!AUTH);
   const p=prof(),b=$('#avbtn');if(b)b.innerHTML=avHtml(52)+'<i class="cam" aria-hidden="true">+</i>';
   const tg=document.querySelector('.hd .tag');if(tg)tg.textContent=p.name?('Hi, '+p.name+' · luyện nghe nói'):'Luyện nghe nói · học ngược';
   const sh=$('#prof');if(!sh||sh.hidden)return}
@@ -3854,8 +3932,9 @@ function openProf(){const sh=$('#prof'),p=prof();
     <div class="avgrid">${AVEMO.map(e=>`<button class="avo${!p.img&&p.emo===e?' on':''}" data-act="avemo" data-e="${e}" aria-label="Avatar ${e}">${e}</button>`).join('')}</div>
     <label class="field"><span>Tên tiếng Anh của bạn</span><input type="text" id="prof-name" maxlength="20" value="${esc(p.name)}" placeholder="Ví dụ: Quinn, Alex, Jack" autocomplete="off" autocapitalize="words"></label>
     <div class="row"><button class="btn sm" data-act="sayname">${SPK} Nghe cách đọc tên</button></div>
-    <p class="hint">Ảnh và tên chỉ lưu trong trình duyệt của bạn trên thiết bị này, không được gửi đi đâu.</p></div>`;
-  sh.hidden=false}
+    <div class="stack acct" id="acct"></div>
+    <p class="hint">Nếu không đăng nhập, ảnh, tên và tiến độ chỉ lưu trong trình duyệt của thiết bị này.</p></div>`;
+  sh.hidden=false;renderAcct()}
 function closeProf(){const sh=$('#prof');if(sh)sh.hidden=true;renderProf()}
 function loadAvatar(file){if(!file)return;const r=new FileReader();
   r.onload=()=>{const im=new Image();im.onload=()=>{const s=Math.min(im.width,im.height),c=document.createElement('canvas');c.width=c.height=192;
@@ -4038,6 +4117,12 @@ document.addEventListener('click',e=>{
     case 'end':if(rec&&recOn){try{rec.abort()}catch(e){}}session=null;stopAudio();render();break;
     case 'ics':{const tm=($('#rm-time')||{}).value||S.set.remind||'20:00';S.set.remind=tm;save();
       try{const u=URL.createObjectURL(new Blob([makeIcs(tm)],{type:'text/calendar;charset=utf-8'}));const a=document.createElement('a');a.href=u;a.download='nhac-hoc-tieng-anh.ics';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast('Đã tạo lịch nhắc lúc '+tm+'. Hãy mở file để thêm vào Lịch.')}catch(e){toast('Không tạo được file nhắc trong khung này. Hãy mở app bằng link riêng của bạn.')}break}
+    case 'signin':doAuth('in');break;
+    case 'signup':doAuth('up');break;
+    case 'forgot':doForgot();break;
+    case 'newpw':doNewPw();break;
+    case 'out':doOut();break;
+    case 'sync':pull();break;
     case 'prof':openProf();break;
     case 'profx':closeProf();break;
     case 'avimg':{const f=$('#prof-file');if(f)f.click();break}
@@ -4123,6 +4208,7 @@ document.addEventListener('keydown',e=>{
     const m={'1':'ok','2':'near','3':'wrong','4':'forgot','5':'fail'}[e.key];if(m){stopAudio();rateCard(m);render()}}});
 
 render();
+authBoot();
 })();
 </script>
 </body></html>
