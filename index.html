@@ -3522,6 +3522,18 @@ function startLesson(n){
 function planFix(){if(!S.plan)S.plan={done:0,last:''};if(S.plan.base===undefined){S.plan.base=S.plan.done||0;S.plan.ok={}}if(!S.plan.ok)S.plan.ok={}}
 const lDone=n=>n<=(S.plan.base||0)||!!S.plan.ok[n];
 let openPh=null,pickL=null;const nextL=()=>{planFix();for(let n=1;n<=LESSONS;n++)if(!lDone(n))return n;return LESSONS};
+function remindPanel(){
+  const t=S.set.remind||'20:00';
+  return `<div class="panel stack"><h3>Nhắc học mỗi ngày</h3>
+    <p class="muted">Trang web không tự gửi thông báo khi đã đóng, nên cách chắc nhất là tạo một lịch lặp hằng ngày có chuông báo trong ứng dụng Lịch của điện thoại. Chuông sẽ kèm đường dẫn mở thẳng app này.</p>
+    <div class="row"><label class="field" style="flex:1 1 140px"><span>Giờ nhắc</span><input type="time" id="rm-time" value="${esc(t)}"></label></div>
+    <button class="btn primary" data-act="ics">Thêm nhắc nhở vào Lịch</button>
+    <p class="hint">iPhone: file sẽ mở ra, bấm Thêm tất cả hoặc Add to Calendar. Trên máy tính Chrome: file được tải về, mở file đó để thêm vào Lịch (Google Calendar hoặc Outlook). Nếu thêm sai giờ, xóa sự kiện trong Lịch rồi tạo lại. Đảm bảo thông báo của ứng dụng Lịch đã bật trong Cài đặt của máy.</p></div>`}
+function makeIcs(time){
+  const [hh,mm]=time.split(':').map(x=>String(+x).padStart(2,'0')),d=new Date(),ds=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');
+  const url=location.href.split('#')[0].split('?')[0];
+  const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Loi Tu Ra//VI','CALSCALE:GREGORIAN','BEGIN:VEVENT','UID:loitura-daily-'+Date.now()+'@loitura','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z','DTSTART:'+ds+'T'+hh+mm+'00','DTEND:'+ds+'T'+hh+String(Math.min(59,+mm+15)).padStart(2,'0')+'00','RRULE:FREQ=DAILY','SUMMARY:Học tiếng Anh 10 từ (Lôi Từ Ra)','DESCRIPTION:Đến giờ luyện nói 10 từ hôm nay. Mở app: '+url,'URL:'+url,'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Đến giờ học tiếng Anh','TRIGGER:PT0S','END:VALARM','END:VEVENT','END:VCALENDAR'];
+  return L.join('\r\n')}
 function histPanel(){
   const lg=S.log||{},ks=Object.keys(lg).sort().reverse().slice(0,14);
   const rows=ks.length?ks.map(k=>{const L=lg[k],[y,m,d]=k.split('-');return `<div class="hrow"><span>${+d}/${+m}/${y}</span><span>${L.n} lượt · ${L.ok} nói đúng</span><span class="sb">${L.ls&&L.ls.length?'Xong ngày '+L.ls.join(', '):''}</span></div>`}).join(''):'<p class="muted">Chưa có lượt học nào được ghi. Học xong một thẻ, lịch sử sẽ hiện ở đây.</p>';
@@ -3562,6 +3574,7 @@ function vPlan(){
   <div class="panel stack"><h3>Các chặng và từng bài</h3><p class="hint">Bấm tên chặng để mở danh sách bài. Chọn một ngày để xem 10 từ rồi học hoặc ôn lại. Dấu ✓ là bài đã xong.</p><div>${phaseRows}</div>
     <p class="hint">Lộ trình tính theo số bài đã học, không theo ngày lịch. Nếu bạn nghỉ vài ngày, bài hôm nay vẫn là bài kế tiếp, không bị dồn.</p></div>
   ${histPanel()}
+  ${remindPanel()}
   <div class="panel stack"><h3>Nhịp học mỗi ngày (10 đến 15 phút)</h3>
     <ol class="steps">
       <li><span><b>Ôn trước (khoảng 3 phút).</b> Hệ thống đưa tối đa 10 từ đến hạn lên đầu bài. Nói từ ra thành tiếng, đừng nhìn đáp án sớm.</span></li>
@@ -3889,6 +3902,8 @@ document.addEventListener('click',e=>{
     case 'ph':{const cur=openPh===null?phaseOf(nextL()):openPh;openPh=cur===d.v?'none':d.v;pickL=null;render();break}
     case 'pick':pickL=pickL===+d.v?null:+d.v;render();break;
     case 'end':if(rec&&recOn){try{rec.abort()}catch(e){}}session=null;stopAudio();render();break;
+    case 'ics':{const tm=($('#rm-time')||{}).value||S.set.remind||'20:00';S.set.remind=tm;save();
+      try{const u=URL.createObjectURL(new Blob([makeIcs(tm)],{type:'text/calendar;charset=utf-8'}));const a=document.createElement('a');a.href=u;a.download='nhac-hoc-tieng-anh.ics';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast('Đã tạo lịch nhắc lúc '+tm+'. Hãy mở file để thêm vào Lịch.')}catch(e){toast('Không tạo được file nhắc trong khung này. Hãy mở app bằng link riêng của bạn.')}break}
     case 'inp':S.set.inp=d.v;if(session){session.fall=false;session.fallMsg=0}save();render();break;
     case 'mic':micToggle();break;
     case 'reveal':{if(rec&&recOn){try{rec.stop()}catch(e){}}const t=$('#typed');if(t)session.typed=t.value;session.phase='back';
@@ -3947,6 +3962,7 @@ document.addEventListener('change',e=>{
   else if(id==='set-topic'){S.set.topic=t.value;save();render()}
   else if(id==='set-batch'){S.set.batch=+t.value;save();render()}
   else if(id==='set-auto'){S.set.auto=t.checked;save()}
+  else if(id==='rm-time'){S.set.remind=t.value;save()}
   else if(id==='set-fx'){S.set.fx=t.checked;save();if(t.checked)beep(true)}
   else if(id==='hint1'){scn.hint=t.checked;render()}
   else if(id==='bank-topic'){bankTopic=t.value;bankLim=100;$('#wl').innerHTML=wlist()}});
