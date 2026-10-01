@@ -140,6 +140,18 @@ mark{background:var(--accent-soft);color:var(--accent);padding:0 4px;border-radi
 .avgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
 .avo{aspect-ratio:1;border-radius:14px;border:1px solid var(--line);background:var(--surface);font-size:26px;cursor:pointer;padding:0}
 .avo.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent)}
+.lbh{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.lbme{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.lbme b{font:800 32px/1 'Bricolage Grotesque',system-ui,sans-serif;background:linear-gradient(90deg,var(--g1),var(--g2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lbme span{color:var(--muted);font-size:14px}
+.lbl{display:flex;flex-direction:column}
+.lbr{display:grid;grid-template-columns:30px 36px 1fr auto;gap:10px;align-items:center;padding:9px 6px;border-top:1px solid var(--line);border-radius:10px}
+.lbr.me{background:var(--accent-soft)}
+.lbr .rk{font-size:20px;text-align:center;font-weight:700}
+.lbr .lav{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-size:20px;font-weight:700;background:linear-gradient(135deg,var(--g1),var(--g2));color:#fff}
+.lbr .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.lbr .pt{text-align:right;font-size:14px;display:flex;flex-direction:column}
+.lbr .pt small{color:var(--muted);font-size:11px}
 .acct{background:var(--accent-soft);border-radius:16px;padding:12px}
 .acct .field{flex:none;width:100%}
 .acct input{width:100%;box-sizing:border-box}
@@ -3684,6 +3696,7 @@ function vPlan(){
   <div class="panel stack"><h3>Các chặng và từng bài</h3><p class="hint">Bấm tên chặng để mở danh sách bài. Chọn một ngày để xem 10 từ rồi học hoặc ôn lại. Dấu ✓ là bài đã xong.</p><div>${phaseRows}</div>
     <p class="hint">Lộ trình tính theo số bài đã học, không theo ngày lịch. Nếu bạn nghỉ vài ngày, bài hôm nay vẫn là bài kế tiếp, không bị dồn.</p></div>
   ${histPanel()}
+  ${lbPanel()}
   ${remindPanel()}
   <div class="panel stack"><h3>Nhịp học mỗi ngày (10 đến 15 phút)</h3>
     <ol class="steps">
@@ -3880,7 +3893,7 @@ async function pull(){if(!AUTH||!SBON)return;const t=await tok();if(!t)return;se
 function schedPush(){clearTimeout(pushT);pushT=setTimeout(()=>push(false),2500)}
 async function push(quiet){if(!AUTH||!SBON)return;const t=await tok();if(!t)return;
   try{await sbf('/rest/v1/progress?on_conflict=user_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:AUTH.uid,data:S,updated_at:new Date().toISOString()})},t);
-    synced=Date.now();setSt('Đã đồng bộ lúc '+new Date(synced).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}))}
+    pushWeek();synced=Date.now();setSt('Đã đồng bộ lúc '+new Date(synced).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}))}
   catch(e){setSt('Chưa đồng bộ được: '+vnErr(e.message))}}
 async function doAuth(kind){
   const em=(($('#ac-mail')||{}).value||'').trim(),pw=($('#ac-pw')||{}).value||'';
@@ -3896,6 +3909,40 @@ async function doForgot(){const em=(($('#ac-mail')||{}).value||'').trim();if(!em
   try{await sbf('/auth/v1/recover?redirect_to='+encodeURIComponent(location.origin+location.pathname),{method:'POST',body:JSON.stringify({email:em})});setSt('Đã gửi email đặt lại mật khẩu. Hãy mở email và bấm vào liên kết.')}catch(e){setSt(vnErr(e.message))}}
 async function doNewPw(){const pw=($('#ac-pw2')||{}).value||'';if(pw.length<6){setSt('Mật khẩu cần ít nhất 6 ký tự.');return}
   const t=await tok();try{await sbf('/auth/v1/user',{method:'PUT',body:JSON.stringify({password:pw})},t);recov=false;setSt('Đã đặt mật khẩu mới.');renderAcct();pull()}catch(e){setSt(vnErr(e.message))}}
+/* ---------- bảng xếp hạng tuần ---------- */
+let LB={rows:null,at:0,busy:false,err:''};
+function weekStart(d){d=d||new Date();const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());const w=(x.getDay()+6)%7;x.setDate(x.getDate()-w);return x}
+const weekKey=()=>dayKey(weekStart());
+function weekStats(){const ws=weekStart(),lg=S.log||{};let pts=0,cards=0,days=0;
+  for(let i=0;i<7;i++){const d=new Date(ws);d.setDate(ws.getDate()+i);const L=lg[dayKey(d)];if(!L)continue;
+    pts+=L.ok*10+(L.n-L.ok)*3+(L.ls?L.ls.length:0)*50+(L.n>=10?20:0);cards+=L.n;days++}
+  return{pts,cards,days}}
+async function pushWeek(){if(!AUTH||!SBON||!S.set.lb)return;const t=await tok();if(!t)return;const w=weekStats(),p=prof();
+  try{await sbf('/rest/v1/weekly_scores?on_conflict=user_id,week',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:AUTH.uid,week:weekKey(),name:(p.name||'Học viên').slice(0,20),emo:(p.emo||'').slice(0,8),points:w.pts,cards:w.cards,days:w.days,updated_at:new Date().toISOString()})},t);LB.at=0}catch(e){LB.err=e.status===404?'Chưa tạo bảng xếp hạng trong Supabase.':vnErr(e.message)}}
+async function lbFetch(){if(!AUTH||!SBON||LB.busy)return;LB.busy=true;const t=await tok();if(!t){LB.busy=false;return}
+  try{LB.rows=await sbf('/rest/v1/weekly_scores?select=user_id,name,emo,points,cards,days&week=eq.'+weekKey()+'&order=points.desc&limit=50',{},t);LB.err=''}
+  catch(e){LB.err=e.status===404?'Chưa tạo bảng xếp hạng trong Supabase.':vnErr(e.message)}
+  LB.at=Date.now();LB.busy=false;if(tab==='plan'&&!session)render()}
+async function lbJoin(on){S.set.lb=on;save();
+  if(on){await pushWeek()}else if(AUTH){const t=await tok();try{await sbf('/rest/v1/weekly_scores?user_id=eq.'+encodeURIComponent(AUTH.uid),{method:'DELETE'},t)}catch(e){}}
+  LB.at=0;lbFetch();render()}
+function lbAv(r){return r.emo?esc(r.emo):esc((r.name||'?').trim()[0]||'?').toUpperCase()}
+function lbPanel(){
+  if(!SBON)return '';
+  const ws=weekStart(),we=new Date(ws);we.setDate(ws.getDate()+6);const rng=ws.getDate()+'/'+(ws.getMonth()+1)+' đến '+we.getDate()+'/'+(we.getMonth()+1);
+  const how='<p class="hint">Cách tính điểm: mỗi lượt nói đúng 10 điểm, lượt khác 3 điểm, hoàn thành một bài +50, ngày học đủ 10 lượt +20. Bảng làm mới mỗi thứ Hai. Đây là bảng vui giữa bạn bè, điểm do app của mỗi người tự tính nên không chống gian lận.</p>';
+  if(!AUTH)return `<div class="panel stack"><h3>Bảng xếp hạng tuần</h3><p class="muted">Đăng nhập (bấm avatar góc trên bên phải) để xem và tham gia bảng xếp hạng cùng những người học chung link này.</p></div>`;
+  const me=weekStats(),joined=!!S.set.lb;
+  let list='';
+  if(LB.err)list=`<p class="hint">${esc(LB.err)}</p>`;
+  else if(!LB.rows)list='<p class="hint">Đang tải bảng xếp hạng...</p>';
+  else if(!LB.rows.length)list='<p class="muted">Tuần này chưa có ai tham gia. Hãy là người đầu tiên.</p>';
+  else list='<div class="lbl">'+LB.rows.map((r,i)=>{const mine=r.user_id===AUTH.uid;return `<div class="lbr${mine?' me':''}"><span class="rk">${['🥇','🥈','🥉'][i]||(i+1)}</span><span class="lav">${lbAv(r)}</span><span class="nm">${esc(r.name||'Học viên')}${mine?' (bạn)':''}</span><span class="pt"><span><b>${r.points}</b> điểm</span><small>${r.cards} lượt · ${r.days} ngày</small></span></div>`}).join('')+'</div>';
+  const rank=LB.rows?LB.rows.findIndex(r=>r.user_id===AUTH.uid)+1:0;
+  return `<div class="panel stack"><div class="lbh"><div><span class="tag">Tuần ${rng}</span><h3>Bảng xếp hạng tuần</h3></div><button class="btn sm" data-act="lbref">Làm mới</button></div>
+    <div class="lbme"><b>${me.pts}</b><span>điểm của bạn tuần này${joined&&rank?' · hạng '+rank:''}</span></div>
+    <label class="check"><input type="checkbox" id="lb-opt"${joined?' checked':''}> Hiện tên và điểm của tôi trên bảng (dùng tên tiếng Anh trong hồ sơ)</label>
+    ${list}${how}</div>`}
 function doOut(){clearTimeout(pushT);authSave(null);syncSt='';renderAcct();renderProf()}
 function renderAcct(){const a=$('#acct');if(!a)return;
   if(!SBON){a.innerHTML='<p class="hint">Tài khoản và đồng bộ chưa được bật trong bản này.</p>';return}
@@ -3935,7 +3982,7 @@ function openProf(){const sh=$('#prof'),p=prof();
     <div class="stack acct" id="acct"></div>
     <p class="hint">Nếu không đăng nhập, ảnh, tên và tiến độ chỉ lưu trong trình duyệt của thiết bị này.</p></div>`;
   sh.hidden=false;renderAcct()}
-function closeProf(){const sh=$('#prof');if(sh)sh.hidden=true;renderProf()}
+function closeProf(){const sh=$('#prof');if(sh)sh.hidden=true;renderProf();if(!session)render()}
 function loadAvatar(file){if(!file)return;const r=new FileReader();
   r.onload=()=>{const im=new Image();im.onload=()=>{const s=Math.min(im.width,im.height),c=document.createElement('canvas');c.width=c.height=192;
     c.getContext('2d').drawImage(im,(im.width-s)/2,(im.height-s)/2,s,s,0,0,192,192);
@@ -4097,7 +4144,7 @@ function confetti(){
 
 /* ---------- render ---------- */
 const TABS=[['plan','Lộ trình','🗺️'],['learn','Luyện ngược','🎯'],['scene','Âm thanh','🔊'],['diag','Đo hai chiều','📊'],['bank','Kho từ','📚']];
-function render(){renderProf();
+function render(){renderProf();if(tab==='plan'&&AUTH&&SBON&&!LB.busy&&Date.now()-LB.at>60000)setTimeout(lbFetch,0);
   $('#nav').innerHTML=TABS.map(([k,l,ic])=>`<button role="tab" aria-selected="${tab===k}" data-act="tab" data-v="${k}"><span class="ic" aria-hidden="true">${ic}</span><span>${l}</span></button>`).join('');
   $('#view').innerHTML=({plan:vPlan,learn:vLearn,scene:vScene,diag:vDiag,bank:vBank})[tab]();
   if($('#cdbar'))startCd();
@@ -4123,6 +4170,7 @@ document.addEventListener('click',e=>{
     case 'newpw':doNewPw();break;
     case 'out':doOut();break;
     case 'sync':pull();break;
+    case 'lbref':LB.at=0;lbFetch();toast('Đang làm mới bảng xếp hạng...');break;
     case 'prof':openProf();break;
     case 'profx':closeProf();break;
     case 'avimg':{const f=$('#prof-file');if(f)f.click();break}
@@ -4192,6 +4240,7 @@ document.addEventListener('change',e=>{
   else if(id==='set-auto'){S.set.auto=t.checked;save()}
   else if(id==='rm-time'){S.set.remind=t.value;save()}
   else if(id==='prof-file'){loadAvatar(t.files&&t.files[0])}
+  else if(id==='lb-opt'){lbJoin(t.checked)}
   else if(id==='set-fx'){S.set.fx=t.checked;save();if(t.checked)beep(true)}
   else if(id==='hint1'){scn.hint=t.checked;render()}
   else if(id==='bank-topic'){bankTopic=t.value;bankLim=100;$('#wl').innerHTML=wlist()}});
