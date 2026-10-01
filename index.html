@@ -182,7 +182,7 @@ header{flex-direction:row;align-items:center;gap:14px;margin-bottom:18px}
 .hd{display:flex;flex-direction:column;gap:2px;min-width:0}
 h1{background:linear-gradient(90deg,var(--g1),var(--g2));-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
 header p{font-size:14px}
-nav{grid-template-columns:repeat(5,1fr);box-shadow:var(--shadow);position:sticky;top:env(safe-area-inset-top,0px);z-index:5;backdrop-filter:blur(8px)}
+nav{grid-template-columns:repeat(5,1fr);box-shadow:var(--shadow);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
 nav button{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;line-height:1.15;padding:8px 2px;transition:background .2s,color .2s,transform .15s}
 nav button .ic{font-size:20px;line-height:1;font-family:'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif}
 nav button:hover{background:var(--accent-soft);color:var(--accent)}
@@ -210,7 +210,7 @@ nav button[aria-selected="true"]{background:linear-gradient(135deg,var(--g1),var
 .hero>*{position:relative;z-index:1}
 .hero .tag,.hero .muted,.hero .hint{color:rgba(255,255,255,.88)}
 .hero h2{color:#fff}
-.hero .vlist span{background:rgba(255,255,255,.18);color:#fff;backdrop-filter:blur(2px)}
+.hero .vlist span{background:rgba(255,255,255,.18);color:#fff;}
 .hero .btn.primary{background:#fff;color:#2338B8;box-shadow:0 8px 20px rgba(0,0,0,.18)}
 .hero-row{display:flex;gap:16px;align-items:center;justify-content:space-between}
 .hero-row>.stack{min-width:0;flex:1}
@@ -225,7 +225,8 @@ nav button[aria-selected="true"]{background:linear-gradient(135deg,var(--g1),var
 .scene{animation:rise .4s .1s both}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 @keyframes pop{from{opacity:0;transform:scale(.6) rotate(-8deg)}to{opacity:1;transform:none}}
-#view>.stack>*{animation:rise .4s both}
+#view>.stack>*{animation:rise .25s both}
+@media (max-width:600px){#view>.stack>*{animation:none}.hero:before,.hero:after{display:none}}
 #view>.stack>*:nth-child(2){animation-delay:.06s}
 #view>.stack>*:nth-child(3){animation-delay:.12s}
 #view>.stack>*:nth-child(4){animation-delay:.18s}
@@ -3459,7 +3460,7 @@ function pickVoice(lang){if(!hasTTS)return null;
   const exact=all.filter(v=>vnorm(v)===lang.toLowerCase());return (exact.length?exact:all)[0]||null}
 function voiceOpts(){return '<option value="">Tự chọn giọng tự nhiên nhất</option>'+enVoices().map(v=>`<option value="${esc(v.voiceURI)}"${S.set.voice===v.voiceURI?' selected':''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('')}
 let AIDX=null,APK={},curAud=null;
-try{fetch('audio/index.json').then(r=>r.ok?r.json():null).then(j=>{AIDX=j}).catch(()=>{})}catch(e){}
+try{fetch('audio/index.json').then(r=>r.ok?r.json():null).then(j=>{AIDX=j;if(j){const f=()=>{const p=0;if(!APK[p])APK[p]=fetch('audio/pack_'+p+'.mp3').then(r=>r.ok?r.arrayBuffer():null).catch(()=>null)};(window.requestIdleCallback||setTimeout)(f,1500)}}).catch(()=>{})}catch(e){}
 async function clip(text){
   if(!AIDX||!AIDX[text])return null;
   const [p,o,l]=AIDX[text];
@@ -3629,12 +3630,13 @@ function heardOk(w,s){
   return t.some(x=>x===en||(' '+x+' ').includes(' '+en+' ')||(en.length>3&&x.replace(/ /g,'')===en.replace(/ /g,'')))}
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 let rec=null,recOn=false;
+const APPLE=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)||/^((?!chrome|android|edg).)*safari/i.test(navigator.userAgent);
 function inputArea(s){
   const inp=(S.set.inp==='type'||s.fall)?'type':'say',lk=s.cdIdx!==s.idx?' disabled':'';
   const sw=`<div class="inp-sw" role="group" aria-label="Cách trả lời"><button class="btn sm" data-act="inp" data-v="say" aria-pressed="${inp==='say'}"${lk}>Nói</button><button class="btn sm" data-act="inp" data-v="type" aria-pressed="${inp==='type'}"${lk}>Gõ</button></div>`;
   if(inp==='type')return sw+`<input type="text" id="typed" placeholder="${!lk&&s.fallMsg?'Không dùng được micro ('+(s.fallMsg===1?'không hỗ trợ':s.fallMsg)+') nên chuyển sang gõ. Gõ từ vào đây':lk?'Hãy nhớ trong 3 giây, rồi mới gõ được':'Gõ từ tiếng Anh vào đây'}"${lk} autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Gõ từ tiếng Anh">`;
   return sw+`<div class="mic"><button class="btn${recOn?' rec':''}" id="micbtn" data-act="mic"${lk}>${recOn?'Dừng thu âm':'Bấm để thu âm và nói'}</button><div class="say-out" id="sayout" aria-live="polite">${s.typed?esc(s.typed):''}</div><p class="hint" id="micst">${lk?'Hãy nhớ trong 3 giây. Hết 3 giây bạn mới được thu âm.':SR?'Nói xong bấm Xem đáp án. Máy sẽ ghi lại những gì nghe được.':'Trình duyệt này chưa hỗ trợ thu âm nhận dạng giọng nói. Bạn cứ nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.'}</p></div>`}
-function micToggle(){
+function micToggle(auto){
   const st=$('#micst'),out=$('#sayout');
   if(!SR){if(st)st.textContent='Trình duyệt này chưa hỗ trợ thu âm nhận dạng giọng nói. Hãy nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.';return}
   if(recOn&&rec){try{rec.stop()}catch(e){}return}
@@ -3642,7 +3644,7 @@ function micToggle(){
     rec=new SR();rec.lang='en-US';rec.interimResults=true;rec.continuous=false;rec.maxAlternatives=3;
     rec.onstart=()=>{recOn=true;const b=$('#micbtn');if(b){b.textContent='Dừng thu âm';b.classList.add('rec')}if(st)st.textContent='Đang nghe... hãy nói.'};
     rec.onresult=ev=>{let t='',al=[];for(let i=0;i<ev.results.length;i++){t+=ev.results[i][0].transcript+' ';for(let j=0;j<ev.results[i].length;j++)al.push(ev.results[i][j].transcript)}session.typed=t.trim();session.alts=al;const o=$('#sayout');if(o)o.textContent=session.typed};
-    rec.onerror=ev=>{if(['not-allowed','service-not-allowed','audio-capture','network','language-not-supported'].includes(ev.error)&&session&&session.phase==='front'){session.fall=true;session.fallMsg=ev.error;recOn=false;render();return}const s2=$('#micst');if(s2)s2.textContent=(ev.error==='not-allowed'||ev.error==='service-not-allowed')?'Trình duyệt không cho dùng micro trong trang này. Bạn cứ nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.':ev.error==='no-speech'?'Chưa nghe thấy gì, thử lại nhé.':'Không thu âm được ('+ev.error+'). Bạn có thể nói thành tiếng rồi tự chấm.'};
+    rec.onerror=ev=>{if(auto&&(ev.error==='not-allowed'||ev.error==='service-not-allowed')){recOn=false;const b=$('#micbtn');if(b){b.textContent='Bấm để thu âm và nói';b.classList.remove('rec')}const s3=$('#micst');if(s3)s3.textContent='Hãy bấm nút thu âm và chọn Cho phép khi trình duyệt hỏi quyền micro.';return}if(['not-allowed','service-not-allowed','audio-capture','network','language-not-supported'].includes(ev.error)&&session&&session.phase==='front'){session.fall=true;session.fallMsg=ev.error;recOn=false;render();return}const s2=$('#micst');if(s2)s2.textContent=(ev.error==='not-allowed'||ev.error==='service-not-allowed')?'Trình duyệt không cho dùng micro trong trang này. Bạn cứ nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.':ev.error==='no-speech'?'Chưa nghe thấy gì, thử lại nhé.':'Không thu âm được ('+ev.error+'). Bạn có thể nói thành tiếng rồi tự chấm.'};
     rec.onend=()=>{recOn=false;if(session&&session.phase==='front'&&session.typed&&session.typed.trim()){const rb=$('#reveal');if(rb&&!rb.disabled){rb.click();return}}const b=$('#micbtn');if(b){b.textContent='Bấm để thu âm và nói';b.classList.remove('rec')}};
     rec.start()
   }catch(e){recOn=false;if(st)st.textContent='Không bật được thu âm. Hãy nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.'}}
@@ -3686,8 +3688,8 @@ function startCd(){
   cdT=setTimeout(()=>{b.disabled=false;
     if(ln){session.cdIdx=session.idx;document.querySelectorAll('.inp-sw .btn,#typed,#micbtn').forEach(e=>{e.disabled=false});
       const t=$('#typed');if(t){t.placeholder='Gõ từ tiếng Anh vào đây';t.focus({preventScroll:true})}
-      if(!t&&S.set.inp!=='type'&&!session.fall){if(!SR){session.fall=true;session.fallMsg=1;render();const t2=$('#typed');if(t2)t2.focus({preventScroll:true});return}session.typed='';micToggle()}
-      const ms=$('#micst');if(ms)ms.textContent=SR?'Nói xong bấm Xem đáp án. Máy sẽ ghi lại những gì nghe được.':'Trình duyệt này chưa hỗ trợ thu âm nhận dạng giọng nói. Bạn cứ nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.';
+      if(!t&&S.set.inp!=='type'&&!session.fall){if(!SR){session.fall=true;session.fallMsg=1;render();const t2=$('#typed');if(t2)t2.focus({preventScroll:true});return}session.typed='';if(APPLE){const ms0=$('#micst');if(ms0)ms0.textContent='Bấm nút thu âm để nói (iPhone và Safari cần bạn bấm trước).'}else micToggle(true)}
+      const ms=$('#micst');if(ms&&!APPLE)ms.textContent=SR?'Nói xong bấm Xem đáp án. Máy sẽ ghi lại những gì nghe được.':'Trình duyệt này chưa hỗ trợ thu âm nhận dạng giọng nói. Bạn cứ nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.';
       lab.textContent='Hết 3 giây. Bây giờ bạn có thể nói, gõ đáp án hoặc xem đáp án.'}
     else{lab.textContent='Hết 3 giây. Bạn có thể xem đáp án.';b.focus({preventScroll:true})}},3040)}
 
