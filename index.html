@@ -106,6 +106,48 @@ mark{background:var(--accent-soft);color:var(--accent);padding:0 4px;border-radi
 .ph .nm{font-weight:600}
 .phh{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
 .lgrid{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px;margin-top:8px}
+.goalp{display:flex;flex-direction:column;gap:14px}
+.goalrow{display:flex;gap:16px;align-items:center}
+.goalrow.sm{background:var(--accent-soft);border-radius:16px;padding:12px}
+.goalrow>.stack{min-width:0}
+.goal{flex:none;max-width:100%}
+.goal .gr{animation:draw 1s cubic-bezier(.3,.7,.2,1) both}
+@keyframes draw{from{stroke-dashoffset:var(--len)}to{stroke-dashoffset:0}}
+.goal .tip{animation:blink 1.4s ease-in-out infinite}
+@keyframes blink{50%{r:3.6;opacity:.7}}
+.goal .core{transform-origin:50px 50px;animation:beat 1.8s ease-in-out infinite}
+@keyframes beat{50%{transform:scale(1.12)}}
+.goal .dart:not(.on){animation:bob 2.6s ease-in-out infinite}
+@keyframes bob{50%{transform:translate(-5px,5px)}}
+.goal .dart.on{animation:stick .6s cubic-bezier(.2,1.4,.4,1) both,shake .5s .6s}
+@keyframes stick{from{opacity:0;transform:translate(16px,-16px) scale(1.2)}to{opacity:1;transform:none}}
+@keyframes shake{25%{transform:rotate(-3deg)}75%{transform:rotate(3deg)}}
+.goal .spark{fill:#f5b301;animation:twinkle 1.6s ease-in-out infinite;opacity:0}
+@keyframes twinkle{50%{opacity:1;transform:scale(1.3)}}
+.goal.win{filter:drop-shadow(0 6px 16px var(--glow))}
+.lvh{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.lvb{text-align:center;flex:none}
+.lvb b{display:block;font:800 36px/1 'Bricolage Grotesque',system-ui,sans-serif;background:linear-gradient(90deg,var(--g1),var(--g2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lvbar{height:10px;border-radius:99px;background:var(--line);overflow:hidden}
+.lvbar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--g1),var(--g2));transition:width .8s}
+.lgs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.lg{display:flex;flex-direction:column;align-items:center;text-align:center;gap:2px;min-width:0}
+.lg .sb{font-size:11px;line-height:1.3}
+.goalp{position:relative;overflow:hidden}
+.goalp>*{position:relative;z-index:1}
+.goalp::before{content:"";z-index:0;position:absolute;right:-60px;top:-60px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,var(--accent-soft),transparent 70%);pointer-events:none}
+.goalp.won{border-color:#f5b301;box-shadow:0 0 0 2px rgba(245,179,1,.35)}
+.gbig{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.gbig b{font:800 34px/1 'Bricolage Grotesque',system-ui,sans-serif;background:linear-gradient(90deg,var(--g1),var(--g2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.gdots{display:flex;flex-wrap:wrap;gap:4px}
+.gdots i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.gdots i.on{background:linear-gradient(135deg,var(--g1),var(--g2))}
+.gdots i.nx{box-shadow:0 0 0 2px var(--accent);animation:blink2 1.4s ease-in-out infinite}
+@keyframes blink2{50%{box-shadow:0 0 0 4px var(--accent-soft)}}
+.gminis{display:flex;gap:4px;justify-content:space-between}
+.gmini{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:1px solid transparent;border-radius:14px;padding:6px;font:600 12px inherit;font-family:inherit;color:var(--muted);cursor:pointer}
+.gmini.on{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+@media (max-width:380px){.goalrow{flex-direction:column;align-items:flex-start}}
 .hrow{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
 .hrow .sb{grid-column:1/-1}
 .lchip{position:relative;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card,transparent);color:inherit;font:600 14px inherit;font-family:inherit;cursor:pointer}
@@ -3522,6 +3564,49 @@ function startLesson(n){
 function planFix(){if(!S.plan)S.plan={done:0,last:''};if(S.plan.base===undefined){S.plan.base=S.plan.done||0;S.plan.ok={}}if(!S.plan.ok)S.plan.ok={}}
 const lDone=n=>n<=(S.plan.base||0)||!!S.plan.ok[n];
 let openPh=null,pickL=null;const nextL=()=>{planFix();for(let n=1;n<=LESSONS;n++)if(!lDone(n))return n;return LESSONS};
+function phRange(k){const idx=ORDER.map((w,i)=>w.topic===k?i:-1).filter(i=>i>=0);if(!idx.length)return null;return[Math.floor(idx[0]/PER)+1,Math.floor(idx[idx.length-1]/PER)+1]}
+function phProg(k){const r=phRange(k);if(!r)return{p:0,dn:0,tot:0,a:0,b:0};let dn=0;for(let n=r[0];n<=r[1];n++)if(lDone(n))dn++;const tot=r[1]-r[0]+1;return{p:dn/tot,dn,tot,a:r[0],b:r[1]}}
+let gUid=0;
+function goalSvg(p,size){
+  const id='g'+(++gUid),R=[45,36,27,18],cl=v=>Math.max(0,Math.min(1,v)),done=p>=1,mini=size<70;let g='';
+  g+=`<defs><linearGradient id="${id}a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--g1)"/><stop offset="1" style="stop-color:var(--g2)"/></linearGradient>
+  <linearGradient id="${id}b" x1="1" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--g2)"/><stop offset="1" style="stop-color:var(--g1)"/></linearGradient>
+  <radialGradient id="${id}c" cx=".38" cy=".35" r=".75"><stop offset="0" stop-color="#fff3b0"/><stop offset=".5" stop-color="#f5b301"/><stop offset="1" stop-color="#e07b00"/></radialGradient>
+  <radialGradient id="${id}d" cx=".5" cy=".5" r=".5"><stop offset="0" style="stop-color:var(--accent-soft)"/><stop offset="1" style="stop-color:var(--surface)"/></radialGradient></defs>`;
+  g+=`<circle cx="50" cy="50" r="49" fill="url(#${id}d)" stroke="var(--line)" stroke-width=".8"/>`;
+  let tip=null;
+  R.forEach((r,i)=>{const f=cl(p*5-i),C=2*Math.PI*r;
+    g+=`<circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--line)" stroke-width="7" opacity=".5"/><circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--muted)" stroke-width=".8" stroke-dasharray="2 3" opacity=".45"/>`;
+    if(f>0){const len=C*f;g+=`<circle class="gr" style="--len:${len.toFixed(1)}px;animation-delay:${(i*.18).toFixed(2)}s" cx="50" cy="50" r="${r}" fill="none" stroke="url(#${id}${i%2?'b':'a'})" stroke-width="7" stroke-linecap="round" stroke-dasharray="${len.toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 50 50)"/>`;
+      if(f<1){const ang=-Math.PI/2+2*Math.PI*f;tip=[50+r*Math.cos(ang),50+r*Math.sin(ang)]}}});
+  if(tip&&!mini)g+=`<circle class="tip" cx="${tip[0].toFixed(1)}" cy="${tip[1].toFixed(1)}" r="2.6" fill="#fff" stroke="var(--accent)" stroke-width="1.2"/>`;
+  const f4=cl(p*5-4);
+  g+=f4>0?`<circle class="core${done?' win':''}" cx="50" cy="50" r="9" fill="url(#${id}c)" opacity="${(.5+.5*f4).toFixed(2)}"/><circle cx="46.5" cy="46.5" r="2.4" fill="#fff" opacity=".7"/>`
+    :`<circle cx="50" cy="50" r="9" fill="none" stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="2 3" opacity=".6"/>`;
+  if(done){g+=`<g class="dart on"><line x1="50" y1="50" x2="82" y2="18" stroke="var(--ink)" stroke-width="3" stroke-linecap="round"/><path d="M82 18 L70.5 19.5 L80.5 29.5 Z" fill="var(--accent)"/><path d="M50 50 L43 49 L51 57 Z" fill="var(--ink)"/></g>`;
+    if(!mini)[[10,16,0],[90,60,.5],[18,86,1],[84,90,.25],[50,3,.75]].forEach(([x,y,d])=>{g+=`<text class="spark" style="animation-delay:${d}s" x="${x}" y="${y}" font-size="9" text-anchor="middle">✦</text>`})}
+  else g+=`<g class="dart"><line x1="97" y1="3" x2="84" y2="16" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round"/><path d="M84 16 L86 8 L92 14 Z" fill="var(--muted)"/></g>`;
+  return `<svg class="goal${done?' win':''}" viewBox="0 0 100 100" width="${size}" height="${size}" role="img" aria-label="Mục tiêu đã hoàn thành ${Math.round(p*100)}%">${g}</svg>`}
+function goalDots(k,next){const r=phRange(k);if(!r)return '';let s='';for(let n=r[0];n<=r[1];n++)s+=`<i class="${lDone(n)?'on':n===next?'nx':''}" title="Bài ngày ${n}"></i>`;return `<div class="gdots" aria-hidden="true">${s}</div>`}
+const GMSG=p=>p>=1?'Trúng hồng tâm! Bạn đã chinh phục cả chặng này.':p>=.8?'Chỉ còn một vòng nhỏ nữa là trúng hồng tâm.':p>=.5?'Hơn nửa mục tiêu đã hiện ra. Đừng dừng lại.':p>=.2?'Từng vòng đang hiện ra. Mỗi bài là một bước tiến.':p>0?'Vòng ngoài đã bắt đầu sáng lên. Hãy cùng tô đầy nó.':'Mục tiêu còn trống. Hoàn thành bài đầu tiên để tô vòng đầu tiên.';
+function goalPanel(k,next){
+  const nm=(PHASES.find(x=>x[0]===k)||[,''])[1],pr=phProg(k),left=pr.tot-pr.dn,pc=Math.round(pr.p*100);
+  const mini=PHASES.map(([kk,n2])=>{const q=phProg(kk);if(!q.tot)return '';return `<button class="gmini${kk===k?' on':''}" data-act="ph" data-v="${kk}" aria-label="${esc(n2)} ${Math.round(q.p*100)}%">${goalSvg(q.p,40)}<span>${Math.round(q.p*100)}%</span></button>`}).join('');
+  return `<div class="panel goalp${pr.p>=1?' won':''}"><div class="goalrow">${goalSvg(pr.p,148)}<div class="stack" style="gap:6px"><span class="tag">Mục tiêu chặng</span><h3>${esc(nm)}</h3><div class="gbig"><b>${pc}%</b><span class="sb">${pr.dn}/${pr.tot} bài${left?` · còn ${left}`:''}</span></div><p class="muted">${GMSG(pr.p)}</p></div></div>${goalDots(k,next)}<div class="gminis">${mini}</div></div>`}
+const LEVELS=[[0,'Khởi động','Bạn đang đặt những viên gạch đầu tiên.'],[50,'Nền tảng','Đã đủ từ cho những câu giao tiếp đơn giản.'],[200,'Giao tiếp cơ bản','Bạn bắt đầu theo được các cuộc trao đổi ngắn.'],[500,'Làm việc được','Đủ vốn từ cho họp và email thường ngày.'],[1000,'Tự tin','Bạn nói và nghe công việc khá thoải mái.'],[2000,'Thành thạo','Vốn từ vững, hãy tập trung vào phản xạ và độ trôi chảy.']];
+function ringG(p,label,val,sub){const r=26,C=2*Math.PI*r,f=Math.max(0,Math.min(1,p));
+  return `<div class="lg"><svg viewBox="0 0 64 64" width="76" height="76" role="img" aria-label="${esc(label)} ${val}"><circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--line)" stroke-width="6"/><circle class="gr" style="--len:${(C*f).toFixed(1)}px" cx="32" cy="32" r="${r}" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(C*f).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 32 32)"/><text x="32" y="36" text-anchor="middle" font-size="13" font-weight="800" fill="var(--ink)">${val}</text></svg><b>${esc(label)}</b><span class="sb">${esc(sub)}</span></div>`}
+function levelPanel(){
+  const all=words(),seen=all.filter(w=>P(w.id).seen),strong=seen.filter(w=>P(w.id).box>=4).length,tot=all.length||1;
+  let li=0;LEVELS.forEach((l,i)=>{if(strong>=l[0])li=i});const cur=LEVELS[li],nx=LEVELS[li+1];
+  const lg=S.log||{},ks=Object.keys(lg).sort().slice(-14);let n=0,ok=0;ks.forEach(k=>{n+=lg[k].n;ok+=lg[k].ok});
+  const reflex=n>=10?ok/n:null;
+  const t0=new Date();let act=0;for(let i=0;i<14;i++){const d=new Date(t0);d.setDate(d.getDate()-i);if(S.days.includes(dayKey(d)))act++}
+  const pctV=strong/tot,pw=Math.min(100,Math.round((nx?(strong-cur[0])/(nx[0]-cur[0]):1)*100));
+  return `<div class="panel stack lvl"><div class="lvh"><div><span class="tag">Trình độ của bạn</span><h3>${esc(cur[1])}</h3><p class="muted">${esc(cur[2])}</p></div><div class="lvb"><b>${strong}</b><span class="sb">từ nhớ vững</span></div></div>
+    <div class="lvbar"><i style="width:${pw}%"></i></div><div class="sb">${nx?`Còn ${nx[0]-strong} từ vững nữa để lên "${esc(nx[1])}"`:'Bạn đã ở mức cao nhất của lộ trình này'}</div>
+    <div class="lgs">${ringG(pctV,'Vốn từ',(pctV*100).toFixed(pctV<.1&&pctV>0?1:0)+'%','nhớ vững '+strong+'/'+tot+' từ')}${ringG(reflex===null?0:reflex,'Phản xạ',reflex===null?'--':Math.round(reflex*100)+'%',reflex===null?'cần thêm 10 lượt học':'nói đúng, 14 ngày qua')}${ringG(act/14,'Đều đặn',act+'/14','ngày có học, 14 ngày qua')}</div>
+    <p class="hint">Đây là ước lượng dựa trên dữ liệu học của bạn, không phải bài kiểm tra chính thức và không thể quy ra "bao nhiêu % người bản xứ". "Nhớ vững" nghĩa là bạn đã nói đúng từ đó nhiều lần liên tiếp và lịch ôn đã giãn ra từ 7 ngày trở lên.</p></div>`}
 function remindPanel(){
   const t=S.set.remind||'20:00';
   return `<div class="panel stack"><h3>Nhắc học mỗi ngày</h3>
@@ -3565,6 +3650,8 @@ function vPlan(){
     ${finished?'':`<button class="btn primary" data-act="lesson" data-v="${next}">${doneToday?'Học trước bài ngày '+next:'Bắt đầu bài hôm nay'}${dueN?' (kèm '+Math.min(dueN,10)+' từ ôn)':''}</button>`}
     ${doneToday&&!finished?'<p class="hint">Bạn đã hoàn thành bài hôm nay. Học thêm là tùy bạn, mỗi bài mới vẫn tính là một ngày trong lộ trình.</p>':''}
   </div>
+  ${levelPanel()}
+  ${goalPanel(openPh&&openPh!=='none'?openPh:phaseOf(next),next)}
   <div class="stats">
     <div class="stat"><span class="si">📘</span><b>${done}/${LESSONS}</b><span>bài đã xong</span></div>
     <div class="stat"><span class="si">🧠</span><b>${learned}</b><span>từ đã đi qua</span></div>
@@ -3698,7 +3785,7 @@ function summary(){
   const s=session,tot=s.ok+s.near+s.fail+(s.wrong||0);
   return `<div class="stack"><div class="panel stack"><div class="done-big" aria-hidden="true">${(s.fail+(s.wrong||0))?'💪':'🏆'}</div><span class="tag">Xong phiên</span><h2>${s.ok} từ nói đúng trong ${s.queue.length} lượt</h2>
     <p class="muted">${(s.fail+(s.wrong||0))?`${s.fail+(s.wrong||0)} lượt bí hoặc nhớ sai sẽ quay lại sớm. Đó là những chỗ bạn học được nhiều nhất.`:'Không lượt nào bị bí. Lần sau hãy thử kiểu thẻ "Chỉ phiên âm" cho khó hơn.'}</p>
-    ${s.lesson?`<p class="muted"><b>Xong bài ngày ${s.lesson}.</b> Bài tiếp theo sẽ mở ở tab Lộ trình.</p>`:''}<div class="row"><button class="btn primary grow" data-act="start">Học thêm một phiên</button><button class="btn grow" data-act="end">Về trang chính</button></div></div>${lisPanel(S.listen)}</div>`}
+    ${s.lesson?`<p class="muted"><b>Xong bài ngày ${s.lesson}.</b> Bài tiếp theo sẽ mở ở tab Lộ trình.</p>`:''}${s.lesson?(()=>{const k=phaseOf(s.lesson),pr=phProg(k);return `<div class="goalrow sm">${goalSvg(pr.p,96)}<div class="stack" style="gap:4px"><b>Mục tiêu chặng đã sáng thêm</b><span class="sb">${pr.dn}/${pr.tot} bài</span><span class="muted">${GMSG(pr.p)}</span></div></div>`})():''}<div class="row"><button class="btn primary grow" data-act="start">Học thêm một phiên</button><button class="btn grow" data-act="end">Về trang chính</button></div></div>${lisPanel(S.listen)}</div>`}
 const vLearn=()=>!session?home():session.phase==='done'?summary():card();
 
 /* đếm 3 giây */
