@@ -315,7 +315,7 @@ nav button[aria-selected="true"]{background:linear-gradient(135deg,var(--g1),var
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.cf{display:none}}
 </style>
 
-</head><body><div class="wrap">
+<div class="wrap">
   <header>
     <div class="logo" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none"><path d="M5 7.5A3.5 3.5 0 0 1 8.5 4h15A3.5 3.5 0 0 1 27 7.5v10a3.5 3.5 0 0 1-3.5 3.5H15l-5.5 5v-5h-1A3.5 3.5 0 0 1 5 17.5z" fill="#fff" fill-opacity=".95"/><path d="M17.2 8.2 12.4 15h3.6l-1.2 5.3 5-7.1h-3.7z" fill="#5B3CE0"/></svg></div>
     <div class="hd"><span class="tag">Luyện nghe nói · học ngược</span>
@@ -3772,27 +3772,28 @@ const nrm=s=>(s||'').toLowerCase().replace(/[^a-z0-9' ]+/g,' ').replace(/\s+/g,'
 function heardOk(w,s){
   const t=[s.typed,...(s.alts||[])].map(nrm).filter(Boolean),en=nrm(w.en);if(!en)return false;
   return t.some(x=>x===en||(' '+x+' ').includes(' '+en+' ')||(en.length>3&&x.replace(/ /g,'')===en.replace(/ /g,'')))}
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-let rec=null,recOn=false;
+const BRAVE=!!(navigator.brave&&navigator.brave.isBrave);
+const SR=BRAVE?null:(window.SpeechRecognition||window.webkitSpeechRecognition);
+let rec=null,recOn=false,micWd=0;
 const APPLE=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)||/^((?!chrome|android|edg).)*safari/i.test(navigator.userAgent);
 function inputArea(s){
   const inp=(S.set.inp==='type'||s.fall)?'type':'say',lk=s.cdIdx!==s.idx?' disabled':'';
   const sw=`<div class="inp-sw" role="group" aria-label="Cách trả lời"><button class="btn sm" data-act="inp" data-v="say" aria-pressed="${inp==='say'}"${lk}>Nói</button><button class="btn sm" data-act="inp" data-v="type" aria-pressed="${inp==='type'}"${lk}>Gõ</button></div>`;
-  if(inp==='type')return sw+`<input type="text" id="typed" placeholder="${!lk&&s.fallMsg?'Không dùng được micro ('+(s.fallMsg===1?'không hỗ trợ':s.fallMsg)+') nên chuyển sang gõ. Gõ từ vào đây':lk?'Hãy nhớ trong 3 giây, rồi mới gõ được':APPLE?'Chạm vào đây, bấm 🎤 trên bàn phím để nói':'Gõ từ tiếng Anh vào đây'}"${lk} autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Gõ từ tiếng Anh">${APPLE?'<p class="hint">iPhone: chạm vào ô, rồi bấm biểu tượng micro 🎤 trên bàn phím để nói. Máy sẽ chép lời bạn nói vào ô này.</p>':''}`;
+  if(inp==='type')return sw+`<input type="text" id="typed" placeholder="${!lk&&s.fallMsg?'Không dùng được micro ('+(s.fallMsg===1?(BRAVE?'Brave chặn nhận dạng giọng nói':'không hỗ trợ'):s.fallMsg)+') nên chuyển sang gõ. Gõ từ vào đây':lk?'Hãy nhớ trong 3 giây, rồi mới gõ được':APPLE?'Chạm vào đây, bấm 🎤 trên bàn phím để nói':'Gõ từ tiếng Anh vào đây'}"${lk} autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Gõ từ tiếng Anh">${BRAVE?'<p class="hint">Brave không cho trang web dùng nhận dạng giọng nói. Hãy gõ từ, hoặc dùng micro của hệ điều hành: Windows bấm Win+H, Mac bấm Fn hai lần. Muốn nói trực tiếp thì mở app bằng Chrome hoặc Safari.</p>':''}${APPLE?'<p class="hint">iPhone: chạm vào ô, rồi bấm biểu tượng micro 🎤 trên bàn phím để nói. Máy sẽ chép lời bạn nói vào ô này.</p>':''}`;
   return sw+`<div class="mic"><button class="btn${recOn?' rec':''}" id="micbtn" data-act="mic"${lk}>${recOn?'Dừng thu âm':'Bấm để thu âm và nói'}</button><div class="say-out" id="sayout" aria-live="polite">${s.typed?esc(s.typed):''}</div><p class="hint" id="micst">${lk?'Hãy nhớ trong 3 giây. Hết 3 giây bạn mới được thu âm.':SR?'Nói xong bấm Xem đáp án. Máy sẽ ghi lại những gì nghe được.':'Trình duyệt này chưa hỗ trợ thu âm nhận dạng giọng nói. Bạn cứ nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.'}</p></div>`}
-if(APPLE&&!S.set.inpAuto){S.set.inp='type';S.set.inpAuto=1;save()}
+if((APPLE||BRAVE)&&!S.set.inpAuto){S.set.inp='type';S.set.inpAuto=1;save()}
 function micToggle(auto){
   const st=$('#micst'),out=$('#sayout');
   if(!SR){if(st)st.textContent='Trình duyệt này chưa hỗ trợ thu âm nhận dạng giọng nói. Hãy nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.';return}
   if(recOn&&rec){try{rec.stop()}catch(e){}return}
   try{
     rec=new SR();rec.lang='en-US';rec.interimResults=true;rec.continuous=false;rec.maxAlternatives=3;
-    rec.onstart=()=>{recOn=true;const b=$('#micbtn');if(b){b.textContent='Dừng thu âm';b.classList.add('rec')}if(st)st.textContent='Đang nghe... hãy nói.'};
+    rec.onstart=()=>{clearTimeout(micWd);recOn=true;const b=$('#micbtn');if(b){b.textContent='Dừng thu âm';b.classList.add('rec')}if(st)st.textContent='Đang nghe... hãy nói.'};
     rec.onresult=ev=>{let t='',al=[];for(let i=0;i<ev.results.length;i++){t+=ev.results[i][0].transcript+' ';for(let j=0;j<ev.results[i].length;j++)al.push(ev.results[i][j].transcript)}session.typed=t.trim();session.alts=al;const o=$('#sayout');if(o)o.textContent=session.typed};
     rec.onerror=ev=>{if(auto&&(ev.error==='not-allowed'||ev.error==='service-not-allowed')){recOn=false;const b=$('#micbtn');if(b){b.textContent='Bấm để thu âm và nói';b.classList.remove('rec')}const s3=$('#micst');if(s3)s3.textContent='Hãy bấm nút thu âm và chọn Cho phép khi trình duyệt hỏi quyền micro.';return}if(['not-allowed','service-not-allowed','audio-capture','network','language-not-supported'].includes(ev.error)&&session&&session.phase==='front'){session.fall=true;session.fallMsg=ev.error;recOn=false;render();return}const s2=$('#micst');if(s2)s2.textContent=(ev.error==='not-allowed'||ev.error==='service-not-allowed')?'Trình duyệt không cho dùng micro trong trang này. Bạn cứ nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.':ev.error==='no-speech'?'Chưa nghe thấy gì, thử lại nhé.':'Không thu âm được ('+ev.error+'). Bạn có thể nói thành tiếng rồi tự chấm.'};
     rec.onend=()=>{recOn=false;if(session&&session.phase==='front'&&session.typed&&session.typed.trim()){const rb=$('#reveal');if(rb&&!rb.disabled){rb.click();return}}const b=$('#micbtn');if(b){b.textContent='Bấm để thu âm và nói';b.classList.remove('rec')}};
-    rec.start()
-  }catch(e){recOn=false;if(st)st.textContent='Không bật được thu âm. Hãy nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.'}}
+    rec.start();clearTimeout(micWd);micWd=setTimeout(()=>{if(!recOn&&session&&session.phase==='front'&&!session.fall){try{rec.abort()}catch(e){}session.fall=true;session.fallMsg=1;render()}},5000)
+  }catch(e){recOn=false;if(session&&session.phase==='front'&&!session.fall){session.fall=true;session.fallMsg=1;render();return}if(st)st.textContent='Không bật được thu âm. Hãy nói thành tiếng rồi tự chấm, hoặc chuyển sang Gõ.'}}
 function card(){
   const s=session,w=byId(s.queue[s.idx]),m=s.mode,p=P(w.id);
   const head=`<div class="prog"><span>${s.idx+1}/${s.queue.length}</span><div class="track"><i style="width:${(s.idx/s.queue.length*100).toFixed(0)}%"></i></div><button class="btn sm" data-act="end">Dừng</button></div>`;
@@ -4260,4 +4261,5 @@ render();
 authBoot();
 })();
 </script>
+
 </body></html>
