@@ -3693,10 +3693,10 @@ function vPlan(){
     <div class="stat"><span class="si flame">🔥</span><b>${streak()}</b><span>ngày liên tiếp</span></div>
     <div class="stat"><span class="si">🏁</span><b style="font-size:22px;padding-right:26px">${finished?'Xong':(eta.getDate()+'/'+(eta.getMonth()+1)+'/'+eta.getFullYear())}</b><span>dự kiến hoàn thành</span></div>
   </div>
+  ${lbPanel()}
   <div class="panel stack"><h3>Các chặng và từng bài</h3><p class="hint">Bấm tên chặng để mở danh sách bài. Chọn một ngày để xem 10 từ rồi học hoặc ôn lại. Dấu ✓ là bài đã xong.</p><div>${phaseRows}</div>
     <p class="hint">Lộ trình tính theo số bài đã học, không theo ngày lịch. Nếu bạn nghỉ vài ngày, bài hôm nay vẫn là bài kế tiếp, không bị dồn.</p></div>
   ${histPanel()}
-  ${lbPanel()}
   ${remindPanel()}
   <div class="panel stack"><h3>Nhịp học mỗi ngày (10 đến 15 phút)</h3>
     <ol class="steps">
@@ -3860,7 +3860,7 @@ try{AUTH=JSON.parse(localStorage.getItem(AK)||'null')}catch(e){AUTH=null}
 function authSave(a){AUTH=a;try{if(a)localStorage.setItem(AK,JSON.stringify(a));else localStorage.removeItem(AK)}catch(e){}}
 async function sbf(path,opt,tok){opt=opt||{};const r=await fetch(SB_URL+path,Object.assign({},opt,{headers:Object.assign({apikey:SB_KEY,'Content-Type':'application/json'},tok?{Authorization:'Bearer '+tok}:{},opt.headers||{})}));
   let j=null;try{j=await r.json()}catch(e){}
-  if(!r.ok){const e=new Error((j&&(j.msg||j.error_description||j.message||j.error))||('HTTP '+r.status));e.status=r.status;throw e}return j}
+  if(!r.ok){const e=new Error((j&&(j.msg||j.error_description||j.message||j.error))||('HTTP '+r.status));e.status=r.status;e.code=(j&&j.code)||'';throw e}return j}
 function setSess(j){if(!j||!j.access_token)return null;authSave({at:j.access_token,rt:j.refresh_token,exp:Date.now()+(j.expires_in||3600)*1000-60000,email:(j.user&&j.user.email)||(AUTH&&AUTH.email)||'',uid:(j.user&&j.user.id)||(AUTH&&AUTH.uid)||''});return AUTH}
 let refreshing=null;
 async function tok(){if(!AUTH)return null;if(Date.now()<AUTH.exp)return AUTH.at;
@@ -3918,11 +3918,12 @@ function weekStats(){const ws=weekStart(),lg=S.log||{};let pts=0,cards=0,days=0;
   for(let i=0;i<7;i++){const d=new Date(ws);d.setDate(ws.getDate()+i);const L=lg[dayKey(d)];if(!L)continue;
     pts+=L.ok*10+(L.n-L.ok)*3+(L.ls?L.ls.length:0)*50+(L.n>=10?20:0);cards+=L.n;days++}
   return{pts,cards,days}}
+function lbErr(e){const c=e.code||'',m=String(e.message||'');if(e.status===404||/PGRST205|PGRST200|42P01|schema cache/i.test(c+m))return 'Supabase chưa nhận ra bảng weekly_scores. Hãy chạy lại file supabase_leaderboard.sql (bản mới có lệnh làm mới), rồi bấm Làm mới. ('+(c||e.status)+')';if(e.status===401||e.status===403||/42501|permission denied/i.test(c+m))return 'Supabase từ chối quyền đọc bảng. Hãy chạy lại file supabase_leaderboard.sql rồi đăng xuất, đăng nhập lại. ('+(c||e.status)+')';return vnErr(m)+' ('+(c||e.status||'mạng')+')'}
 async function pushWeek(){if(!AUTH||!SBON||!S.set.lb)return;const t=await tok();if(!t)return;const w=weekStats(),p=prof();
-  try{await sbf('/rest/v1/weekly_scores?on_conflict=user_id,week',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:AUTH.uid,week:weekKey(),name:(p.name||'Học viên').slice(0,20),emo:(p.emo||'').slice(0,8),points:w.pts,cards:w.cards,days:w.days,updated_at:new Date().toISOString()})},t);LB.at=0}catch(e){LB.err=e.status===404?'Chưa tạo bảng xếp hạng trong Supabase.':vnErr(e.message)}}
+  try{await sbf('/rest/v1/weekly_scores?on_conflict=user_id,week',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:AUTH.uid,week:weekKey(),name:(p.name||'Học viên').slice(0,20),emo:(p.emo||'').slice(0,8),points:w.pts,cards:w.cards,days:w.days,updated_at:new Date().toISOString()})},t);LB.at=0}catch(e){LB.err=lbErr(e)}}
 async function lbFetch(){if(!AUTH||!SBON||LB.busy)return;LB.busy=true;const t=await tok();if(!t){LB.busy=false;return}
   try{LB.rows=await sbf('/rest/v1/weekly_scores?select=user_id,name,emo,points,cards,days&week=eq.'+weekKey()+'&order=points.desc&limit=50',{},t);LB.err=''}
-  catch(e){LB.err=e.status===404?'Chưa tạo bảng xếp hạng trong Supabase.':vnErr(e.message)}
+  catch(e){LB.err=lbErr(e)}
   LB.at=Date.now();LB.busy=false;if(tab==='plan'&&!session)render()}
 async function lbJoin(on){S.set.lb=on;save();
   if(on){await pushWeek()}else if(AUTH){const t=await tok();try{await sbf('/rest/v1/weekly_scores?user_id=eq.'+encodeURIComponent(AUTH.uid),{method:'DELETE'},t)}catch(e){}}
@@ -4261,5 +4262,3 @@ render();
 authBoot();
 })();
 </script>
-
-</body></html>
